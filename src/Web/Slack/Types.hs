@@ -15,6 +15,9 @@
 module Web.Slack.Types
   ( Color(..)
   , UserId(..)
+  , ConversationId(..)
+  , TeamId(..)
+  , ConversationId(..)
   , SlackTimestamp(..)
   , mkSlackTimestamp
   , SlackMessageText(..)
@@ -48,6 +51,16 @@ newtype Color = Color { unColor :: Text }
 
 -- Ord to allow it to be a key of a Map
 newtype UserId = UserId { unUserId :: Text }
+  deriving (Eq, Ord, Generic, Show, FromJSON)
+
+-- | Common identifier for every type of 'Conversation'.
+--   Unique to the team which the conversation belongs to.
+-- Ord to allow it to be a key of a Map
+newtype ConversationId = ConversationId { unConversationId :: Text }
+  deriving (Eq, Ord, Generic, Show, FromJSON)
+
+-- Ord to allow it to be a key of a Map
+newtype TeamId = TeamId { unTeamId :: Text }
   deriving (Eq, Ord, Generic, Show, FromJSON)
 
 -- | Message text in the format returned by Slack,

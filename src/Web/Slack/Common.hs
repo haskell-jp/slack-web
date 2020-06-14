@@ -18,6 +18,8 @@
 module Web.Slack.Common
   ( Color(unColor)
   , UserId(unUserId)
+  , ConversationId(unConversationId)
+  , TeamId(unTeamId)
   , SlackTimestamp(..)
   , mkSlackTimestamp
   , HistoryReq(..)

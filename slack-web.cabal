@@ -36,6 +36,7 @@ library
       Web.Slack.Channel
       Web.Slack.Chat
       Web.Slack.Common
+      Web.Slack.Conversation
       Web.Slack.Group
       Web.Slack.Im
       Web.Slack.MessageParser
@@ -56,6 +57,7 @@ library
     , text >= 1.2 && < 1.3
     , transformers
     , mtl
+    , scientific
     , time
     , errors
     , megaparsec >= 5.0 && < 9
