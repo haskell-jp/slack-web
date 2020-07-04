@@ -14,6 +14,9 @@
 module Web.Slack.Conversation
   ( Conversation(..)
   , ConversationId(..)
+  , ChannelConversation(..)
+  , GroupConversation(..)
+  , ImConversation(..)
   , TeamId(..)
   , Purpose(..)
   , Topic(..)
@@ -31,10 +34,11 @@ import qualified Data.HashMap.Strict as HM
 import GHC.Generics (Generic)
 
 -- http-api-data
-import Web.FormUrlEncoded
+-- import Web.FormUrlEncoded
 
 -- slack-web
 import Web.Slack.Common
+import Web.Slack.Types
 import Web.Slack.Util
 
 -- scientific
@@ -169,9 +173,6 @@ data ImConversation =
   ImConversation
     { imId :: ConversationId
     , imName :: Text
-    , imIsChannel :: Bool
-    , imIsGroup :: Bool
-    , imIsIm :: Bool
     , imCreated :: Integer
     , imIsArchived :: Bool
     , imIsGeneral :: Bool

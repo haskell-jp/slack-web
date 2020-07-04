@@ -36,6 +36,7 @@ library
       Web.Slack.Channel
       Web.Slack.Chat
       Web.Slack.Common
+      Web.Slack.Conversation
       Web.Slack.Group
       Web.Slack.Im
       Web.Slack.MessageParser
@@ -46,6 +47,7 @@ library
   build-depends:
       aeson >= 1.0 && < 1.5
     , base >= 4.11 && < 4.15
+    , scientific
     , containers
     , unordered-containers
     , http-api-data >= 0.3 && < 0.5
@@ -77,6 +79,7 @@ test-suite tests
       exitcode-stdio-1.0
   other-modules:
       Web.Slack.MessageParserSpec
+      Web.Slack.ConversationSpec
   build-depends:
       base
     , slack-web
