@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -14,16 +16,22 @@
 module Web.Slack.Conversation
   ( Conversation(..)
   , ConversationId(..)
+  , ConversationType(..)
   , ChannelConversation(..)
   , GroupConversation(..)
   , ImConversation(..)
   , TeamId(..)
   , Purpose(..)
   , Topic(..)
+  , ListReq(..)
+  , mkListReq
+  , ListRsp(..)
+  , HistoryRsp(..)
   ) where
 
 -- aeson
 import Data.Aeson
+import Data.Aeson.Encoding
 import Data.Aeson.TH
 import Data.Aeson.Types
 
@@ -31,13 +39,15 @@ import Data.Aeson.Types
 import qualified Data.HashMap.Strict as HM
 
 -- base
+import Control.Applicative (empty, (<|>))
 import GHC.Generics (Generic)
 
 -- http-api-data
--- import Web.FormUrlEncoded
+import Web.FormUrlEncoded
+import Web.HttpApiData
 
 -- slack-web
-import Web.Slack.Common
+import Web.Slack.Common hiding (HistoryRsp)
 import Web.Slack.Types
 import Web.Slack.Util
 
@@ -46,6 +56,7 @@ import Data.Scientific
 
 -- text
 import Data.Text (Text)
+import qualified Data.Text as T
 
 
 -- |
@@ -172,40 +183,11 @@ $(deriveJSON (jsonOpts "group") ''GroupConversation)
 data ImConversation =
   ImConversation
     { imId :: ConversationId
-    , imName :: Text
     , imCreated :: Integer
     , imIsArchived :: Bool
-    , imIsGeneral :: Bool
-    , imUnlinked :: Integer
-    , imNameNormalized :: Text
-    , imIsShared :: Bool
-
-    -- FIXME:
-    -- I'm not sure the correct type of this field, because I only found
-    -- example responses whose @parent_conversation@ is @null@
-    -- , im_parent_conversation :: null
-
-    , imCreator :: UserId
-    , imIsExtShared :: Bool
     , imIsOrgShared :: Bool
-    , imSharedTeamIds :: [TeamId]
-
-    -- FIXME:
-    -- I'm not sure the correct type of these fields, because I only found
-    -- example responses whose @pending_connected_team_ids@ and
-    -- @pending_shared@ are empty arrays. (Perhaps this is because
-    -- my team is a free account. The names make me guess its type is
-    -- @[TeamId]@, but these were not documented as long as I looked up.
-    -- im_pending_shared :: []
-    -- im_pending_connected_team_ids :: []
-
-    , imIsPendingExtShared :: Bool
-    , imIsMember :: Bool
-    , imIsPrivate :: Bool
-    , imLastRead :: SlackTimestamp
-    , imIsOpen :: Bool
-    , imTopic :: Topic
-    , imPurpose :: Purpose
+    , imUser :: UserId
+    , imIsUserDeleted :: Bool
     , imPriority :: Scientific
     }
   deriving (Eq, Generic, Show)
@@ -224,22 +206,19 @@ data Conversation =
 
 
 instance FromJSON Conversation where
-  parseJSON = withObject "Conversation" $ \o -> do
-    isChannel <- o .: "is_channel"
-    if isChannel
-      then Channel <$> parseJSON (Object o)
-      else do
-        isGroup <- o .: "is_group"
-        if isGroup
-          then Group <$> parseJSON (Object o)
-          else do
-            isIm <- o .: "is_im"
-            if isIm
-              then Im <$> parseJSON (Object o)
-              else
-                prependFailure
-                  "parsing a Conversation failed: neither channel, group, nor im, "
-                  (typeMismatch "Conversation" (Object o))
+  parseJSON = withObject "Conversation" $ \o ->
+    parseWhen "is_channel" Channel o
+      <|> parseWhen "is_group" Group o
+      <|> parseWhen "is_im" Im o
+      <|> prependFailure
+            "parsing a Conversation failed: neither channel, group, nor im, "
+            (typeMismatch "Conversation" (Object o))
+   where
+    parseWhen key con o = do
+      is <- (o .: key) <|> empty
+      if is
+        then con <$> parseJSON (Object o)
+        else empty
 
 
 instance ToJSON Conversation where
@@ -261,3 +240,101 @@ instance ToJSON Conversation where
           . HM.insert "is_channel" (Bool False)
           . HM.insert "is_group" (Bool False)
           $ HM.insert "is_im" (Bool True) obj
+
+
+data ConversationType =
+    PublicChannelType
+  | PrivateChannelType
+  | MpimType
+  | ImType
+  deriving (Eq, Generic, Show)
+
+instance ToHttpApiData ConversationType where
+  toUrlPiece PublicChannelType = "public_channel"
+  toUrlPiece PrivateChannelType = "private_channel"
+  toUrlPiece MpimType = "mpim"
+  toUrlPiece ImType = "im"
+
+instance ToJSON ConversationType where
+  toJSON = toJSON . toUrlPiece
+  toEncoding = text . toUrlPiece
+
+instance FromJSON ConversationType where
+  parseJSON = withText "ConversationType" $ \case
+    "public_channel" -> pure PublicChannelType
+    "private_channel" -> pure PrivateChannelType
+    "mpim" -> pure MpimType
+    "im" -> pure ImType
+    actual ->
+      prependFailure "must be either \"public_channel\", \"private_channel\", \"mpim\" or \"im\"!"
+        . typeMismatch "ConversationType" $ String actual
+
+
+
+data ListReq =
+  ListReq
+    { listReqExcludeArchived :: Maybe Bool
+    , listReqTypes :: [ConversationType]
+    }
+  deriving (Eq, Generic, Show)
+
+
+-- |
+--
+--
+
+$(deriveJSON (jsonOpts "listReq") ''ListReq)
+
+-- |
+--
+--
+
+mkListReq
+  :: ListReq
+mkListReq =
+  ListReq
+    { listReqExcludeArchived = Nothing
+    , listReqTypes = []
+    }
+
+
+-- |
+--
+--
+
+instance ToForm ListReq where
+  toForm (ListReq archived types) =
+    archivedForm <> typesForm
+   where
+    archivedForm =
+      maybe mempty (\val -> [("archived", toUrlPiece val)]) archived
+    typesForm =
+      if null types
+        then mempty
+        else [("types", T.intercalate "," $ map toUrlPiece types)]
+
+
+-- |
+--
+
+newtype ListRsp =
+  ListRsp
+    { listRspChannels :: [Conversation]
+    }
+  deriving (Eq, Generic, Show)
+
+$(deriveFromJSON (jsonOpts "listRsp") ''ListRsp)
+
+
+-- |
+--
+
+data HistoryRsp =
+  HistoryRsp
+    { historyRspMessages :: [Message]
+    , historyRspHasMore :: Bool
+    , historyRspPinCount :: Integer
+    }
+  deriving (Eq, Generic, Show)
+
+$(deriveJSON (jsonOpts "historyRsp") ''HistoryRsp)

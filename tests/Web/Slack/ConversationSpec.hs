@@ -108,19 +108,6 @@ instance Arbitrary ImConversation where
     <*> arbitrary
     <*> arbitrary
     <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
-    <*> arbitrary
 
 instance Arbitrary Conversation where
   arbitrary = oneof [Channel <$> arbitrary, Group <$> arbitrary, Im <$> arbitrary]
