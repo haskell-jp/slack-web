@@ -71,10 +71,13 @@ loadingPage :: (Monad m, Monoid n) => LoadPage m a -> (Response [a] -> m n) -> m
 loadingPage loadPage usePage = go mempty
  where
   go result = do
-    page <- loadPage
-    if null page
-      then return result
-      else (go $!) . (result <>) =<< usePage page
+    epage <- loadPage
+    case epage of
+        Right page ->
+          if null page
+            then return result
+            else (go $!) . (result <>) =<< usePage epage
+        Left e -> (result <>) <$> usePage (Left e)
 
 
 genericFetchAllBy
